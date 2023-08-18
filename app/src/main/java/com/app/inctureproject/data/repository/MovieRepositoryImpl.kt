@@ -11,10 +11,14 @@ class MovieRepositoryImpl @Inject constructor(private val api: MovieApiInterface
 
     override suspend fun getMovies(query: String): Resource<List<Movie>> {
         val movieResponse = api.getMovies(query)
-        return if(movieResponse.isSuccessful){
-            movieResponse.body()?.movieResults?.let { Resource.Success(it.toMovieUiModel()) } ?: Resource.Error(null,Exception("List Is Empty"))
-        }else{
-            Resource.Error(null,Exception(movieResponse.errorBody()?.string()))
+        return try {
+            if(movieResponse.isSuccessful){
+                movieResponse.body()?.movieResults?.let { Resource.Success(it.toMovieUiModel()) } ?: Resource.Error(null,Exception("List Is Empty"))
+            }else{
+                Resource.Error(null,Exception(movieResponse.errorBody()?.string()))
+            }
+        }catch (e : Exception){
+            Resource.Error(null,e)
         }
     }
 }
