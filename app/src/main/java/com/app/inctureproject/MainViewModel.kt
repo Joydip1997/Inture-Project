@@ -11,11 +11,13 @@ import com.app.inctureproject.data.repository.MovieRepository
 import com.app.inctureproject.utils.Resource
 import com.app.inctureproject.utils.UiStates
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -29,17 +31,24 @@ class MainViewModel @Inject constructor(
     private val _uiState : MutableSharedFlow<UiStates> = MutableSharedFlow()
     val uiState : SharedFlow<UiStates> = _uiState.asSharedFlow()
 
+    private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        viewModelScope.launch {
+            _uiState.emit(UiStates.Error(throwable.message))
+        }
+    }
+
     fun onMovieSearch(query : String){
-        viewModelScope.launch(Dispatchers.IO) {
-            _uiState.emit(UiStates.Loading)
-            val state = movieRepository.getMovies(query)
-            when(state){
-                is Resource.Error -> {
-                    _uiState.emit(UiStates.Error(state.error?.message))
-                }
-                is Resource.Success -> {
-                    _movieList.postValue(state.data!!)
-                    _uiState.emit(UiStates.Complete)
+        viewModelScope.launch(exceptionHandler) {
+            withContext(Dispatchers.IO){
+                _uiState.emit(UiStates.Loading)
+                when(val state = movieRepository.getMovies(query)){
+                    is Resource.Error -> {
+                        _uiState.emit(UiStates.Error(state.error?.message))
+                    }
+                    is Resource.Success -> {
+                        _movieList.postValue(state.data!!)
+                        _uiState.emit(UiStates.Complete)
+                    }
                 }
             }
         }
